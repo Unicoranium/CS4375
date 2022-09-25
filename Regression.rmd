@@ -1,0 +1,212 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+Brandon Runyon
+9/25/22
+
+Data taken from [Kaggle](https://www.kaggle.com/datasets/aliibrahim10/valorant-stats).
+Data taken from the leader board for the game VALORANT.
+
+Players who perform better each round are more likely to win. Performance can be measured with variables like damage dealt or kills.
+
+I will use this data of overall statistics for the top players during a single season of the game to try to predict their win rates. 
+
+# Load and preprocess
+
+Load "val_stats.csv"
+
+```{r}
+df <- read.csv("val_stats.csv")
+str(df)
+```
+
+Check the number of NAs in each column.
+
+```{r}
+sapply(df, function(x) sum(is.na(x)))
+```
+NA in region refers to North America, so no NA data, but needs to be handled for factors.
+
+Convert columns to factors
+
+```{r}
+cols <- c("region", "rating", "agent_1", "agent_2", "agent_3", "gun1_name", "gun2_name", "gun3_name")
+df[cols] <- lapply(df[cols], factor, exclude = NULL)
+```
+
+Some columns are read as strings instead of numbers due to commas.
+
+```{r}
+
+cols <- c("headshots", "first_bloods", "kills", "deaths", "assists", "gun1_kills", "gun2_kills")
+df[cols] <- lapply(df[cols], gsub, pattern = ",", replacement = "")
+df[cols] <- lapply(df[cols], as.numeric)
+
+```
+
+View new data
+
+```{r}
+str(df)
+```
+
+Most data is from the top few players (those labeled with Immortal or Radiant).
+
+```{r}
+counts <- table(df$rating)
+barplot(counts)
+```
+
+Remove all players who aren't Immortal 1/2/3, or Radiant and refactor.
+
+```{r}
+i <- which(df$rating == "Immortal 1" | df$rating == "Immortal 2" | df$rating == "Immortal 3" | df$rating == "Radiant")
+df <- df[i,]
+df$rating <- factor(df$rating)
+str(df)
+```
+
+Same table now shows the top players only.
+
+```{r}
+counts <- table(df$rating)
+barplot(counts)
+```
+
+# Basic analysis of the data
+
+```{r}
+pairs(df[,c("headshot_percent","kills_round","win_percent", "damage_round", "kd_ratio")], col=df$rating)
+```
+
+Win percent has several with 0% or 100% win rate, which is unrealistic. These are likely players who only played the 1 required game to get their rank for the season.
+
+These data values are also very tightly packed regardless of rating. They only seem to get tighter by rating.
+
+```{r}
+i <- which(df$win_percent == 0 | df$win_percent == 100)
+df <- df[-i,]
+```
+
+# Linear Regression
+
+```{r}
+plot(df$win_percent~df$damage_round, xlab="Kills Per Round", ylab="Win Percent")
+abline(lm(df$win_percent~df$damage_round), col="red")
+```
+
+Just by graphing, it doesn't appear as though using just one variable is a good representation of win rate.
+
+Build the regression model to see how accurate it is.
+
+Allocate test and train data.
+
+```{r}
+set.seed(1)
+i <- sample(1:nrow(df), 0.8*nrow(df), replace=FALSE)
+train <- df[i,]
+test <- df[-i,]
+```
+
+# Single Variable Linear Regression
+
+Run linear regression on a single variable
+
+```{r}
+lm1 <- lm(win_percent~damage_round, data=train)
+lm1
+```
+
+Measure covariance
+
+```{r}
+pred <- predict(lm1, newdata=test)
+cov(pred, test$win_percent) / (sd(pred)*sd(test$win_percent))
+```
+
+Low covariance indicates this model wasn't good at predicting the win rates.
+
+```{r}
+summary(lm1)
+```
+Very low R-squared shows it wasn't a good model for this data.
+
+Calculate other statistics to evaluate.
+
+```{r}
+correlation <- cor(pred, test$win_percent)
+print(paste("correlation: ", correlation))
+mse <- mean((pred - test$win_percent)^2)
+print(paste("mse: ", mse))
+rmse <- sqrt(mse)
+print(paste("rmse: ", rmse))
+```
+
+These statistics further indicate a bad model.
+
+Plot the residuals to visualize the accuracy of the model.
+
+```{r}
+par(mfrow=c(2,2))
+plot(lm1)
+```
+This shows that the values are not well predicted due to the nature of the data.
+
+# Multiple Variable Linear Regression
+
+```{r}
+lm2 <- lm(win_percent~damage_round+kills_round+headshot_percent+kd_ratio+score_round, data=train)
+summary(lm2)
+```
+
+Run anova()
+
+```{r}
+anova(lm1, lm2)
+```
+
+This shows that using multiple variables is better, though still not perfect.
+
+```{r}
+pred2 <- predict(lm2, newdata=test)
+cor2 <- cor(pred2, test$win_percent)
+mse2 <- mean((pred2-test$win_percent)^2) 
+rmse2 <- sqrt(mse2)
+print(paste('correlation:', cor2))
+print(paste('mse:', mse2))
+print(paste('rmse:', rmse2))
+```
+
+More evaluations of the second model showing slight improvement from the first.
+
+# Multiple Variable Linear Regression with Interaction
+
+```{r}
+lm3 <- lm(win_percent~damage_round+kills_round+headshot_percent+kd_ratio+score_round+damage_round*kills_round*headshot_percent*kd_ratio*score_round, data=train)
+summary(lm3)
+```
+
+Run anova()
+
+```{r}
+anova(lm2, lm3)
+```
+
+This shows that using interaction didn't change the result.
+
+```{r}
+pred3 <- predict(lm3, newdata=test)
+cor3 <- cor(pred3, test$win_percent)
+mse3 <- mean((pred3-test$win_percent)^2) 
+rmse3 <- sqrt(mse3)
+print(paste('correlation:', cor3))
+print(paste('mse:', mse3))
+print(paste('rmse:', rmse3))
+```
+
+# Conclusion
+
+All of these models didn't work for this data set. They were unable to accurately distinguish between the data points since they were so tightly packed.
+
+This likely didn't work due to the wide range of differently performing players. Any time a player does better, someone else will do worse, but they still remain in the data set.

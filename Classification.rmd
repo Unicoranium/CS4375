@@ -1,0 +1,202 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+Brandon Runyon
+9/25/22
+
+Data taken from [Kaggle](https://www.kaggle.com/datasets/aliibrahim10/valorant-stats).
+Data taken from the leader board for the game VALORANT.
+
+These models are built for single classification, but the ratings in the game are multiclass. This means I will have to do one-for-all to do the regression.
+
+The rating system the game uses is similar to the [Elo Rating System](https://en.wikipedia.org/wiki/Elo_rating_system). At the end of each match, it compares your performance to the other players in the game. Over time, the players approach the rating that best represents them.
+
+I will use this data of overall statistics for the top players during a single season of the game to try to predict their rating. 
+
+# Load and preprocess
+
+Load "val_stats.csv"
+
+```{r}
+df <- read.csv("val_stats.csv")
+str(df)
+```
+
+Check the number of NAs in each column.
+
+```{r}
+sapply(df, function(x) sum(is.na(x)))
+```
+NA in region refers to North America, so no NA data, but needs to be handled for factors.
+
+Convert columns to factors
+
+```{r}
+cols <- c("region", "rating", "agent_1", "agent_2", "agent_3", "gun1_name", "gun2_name", "gun3_name")
+df[cols] <- lapply(df[cols], factor, exclude = NULL)
+```
+
+Some columns are read as strings instead of numbers due to commas.
+
+```{r}
+
+cols <- c("headshots", "first_bloods", "kills", "deaths", "assists", "gun1_kills", "gun2_kills")
+df[cols] <- lapply(df[cols], gsub, pattern = ",", replacement = "")
+df[cols] <- lapply(df[cols], as.numeric)
+
+```
+
+View new data
+
+```{r}
+str(df)
+```
+
+Most data is from the top few players (those labeled with Immortal or Radiant).
+
+```{r}
+counts <- table(df$rating)
+barplot(counts)
+```
+
+Remove all players who aren't Immortal 1/2/3, or Radiant and refactor.
+
+```{r}
+i <- which(df$rating == "Immortal 1" | df$rating == "Immortal 2" | df$rating == "Immortal 3" | df$rating == "Radiant")
+df <- df[i,]
+df$rating <- factor(df$rating)
+str(df)
+```
+
+Same table now shows the top players only.
+
+```{r}
+counts <- table(df$rating)
+barplot(counts)
+```
+
+# Basic analysis of the data
+
+```{r}
+pairs(df[,c("headshot_percent","kills_round","win_percent", "damage_round", "kd_ratio")], col=df$rating)
+```
+
+Win percent has several with 0% or 100% win rate, which is unrealistic. These are likely players who only played the 1 required game to get their rank for the season.
+
+These data values are also very tightly packed regardless of rating. They only seem to get tighter by rating.
+
+```{r}
+i <- which(df$win_percent == 0 | df$win_percent == 100)
+df <- df[-i,]
+```
+
+Multiple possible ratings, so we must divide it for multiclass
+
+```{r}
+dfR <- df
+dfR$rating <- as.factor(ifelse(dfR$rating=="Radiant",1,0))
+
+dfI1 <- df
+dfI1$rating <- as.factor(ifelse(dfI1$rating=="Immortal 1",1,0))
+
+dfI2 <- df
+dfI2$rating <- as.factor(ifelse(dfI2$rating=="Immortal 2",1,0))
+
+dfI3 <- df
+dfI3$rating <- as.factor(ifelse(dfI3$rating=="Immortal 3",1,0))
+```
+
+# Logistic Regression
+
+Define function
+
+```{r}
+fun <- function(df, i){
+  train <- df[i,]
+  test <- df[-i,]
+  glm1 <- glm(rating~win_percent+headshot_percent+kd_ratio+kills_round+damage_round+win_percent*headshot_percent*kd_ratio*kills_round*damage_round, data=train, family="binomial")
+  probs <- predict(glm1, newdata=test)
+  pred <- ifelse(probs>0.5, 1, 0)
+  acc <- mean(pred==test$rating)
+  print(paste("accuracy = ", acc))
+  table(pred, test$rating)
+}
+```
+
+Run for Radiant
+
+```{r}
+set.seed(1)
+i <- sample(1:nrow(df), 0.8*nrow(df), replace=FALSE)
+fun(dfR, i)
+```
+
+Run for Immortal 1
+
+```{r}
+fun(dfI1, i)
+```
+
+Run for Immortal 2
+
+```{r}
+fun(dfI2, i)
+```
+
+Run for Immortal 3
+
+```{r}
+fun(dfI3, i)
+```
+
+These tests did not work very well with this data set. The largest difference between the ranks is that the data is tighter around a central value. A higher rating means the player is more likely to remain near the average. This can be seen in the pairs graph above as most points are in the same area. The model ended up just guessing false for everything since that gave it the highest accuracy.
+
+# Naive Bayes
+
+Create function for naive bayes
+
+```{r}
+library(e1071)
+fun1 <- function(df, i){
+  train <- df[i,]
+  test <- df[-i,]
+  nb <- naiveBayes(rating~win_percent+headshot_percent+kd_ratio+kills_round+damage_round, data=train)
+  print(nb)
+  pred <- predict(nb, newdata=test, type="class")
+  acc <- mean(pred==test$rating)
+  print(paste("accuracy = ", acc))
+  table(pred, test$rating)
+}
+```
+
+Run for Radiant
+
+```{r}
+fun1(dfR, i)
+```
+
+Run for Immortal 1
+
+```{r}
+fun1(dfI1, i)
+```
+
+Run for Immortal 2
+
+```{r}
+fun1(dfI2, i)
+```
+
+Run for Immortal 3
+
+```{r}
+fun1(dfI3, i)
+```
+Similarly to the logistic regression, this model didn't work very well. It ended up just saying false for everything except Immortal 1. 
+
+# Conclusion
+
+Both of these models didn't work for this data set. They were unable to accurately distinguish between the data points since they were so tightly packed.
+
+Because a players rank changes based on individual games rather than overall statistics, it makes it more difficult to accurately predict using these models.

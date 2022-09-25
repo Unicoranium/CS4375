@@ -8,3 +8,7 @@ Projects in CS 4375
 
 [Portfolio Assignment: Data Exploration](dataExploration.pdf)
 [Portfolio Assignment: Data Exploration c++](dataExploration.cpp)
+
+
+[Portfolio Assignment: Linear Models Regression](Regression.pdf)
+[Portfolio Assignment: Linear Models Classification](Classification.pdf)
