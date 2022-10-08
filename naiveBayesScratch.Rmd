@@ -158,9 +158,14 @@ Let's look at just the first 5 test observations.
 
 
 ```{r}
-for (i in 1:5){
-  raw <- calc_raw_prob(df[i,1], as.integer(df[i,3]), df[i,4])
-  print(paste(raw[2], raw[1]))
+correct <- 0
+for (i in 1:nrow(test)){
+  raw <- calc_raw_prob(test[i,1], as.integer(test[i,3]), test[i,4])
+  if (as.integer(round(as.numeric(raw[1]))) == as.integer(test[i,2])-1) {
+    correct <- correct + 1
+  }
 }
 pred[1:5,]
+acc <- correct/nrow(test)
+acc
 ```
