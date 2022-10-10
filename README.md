@@ -29,3 +29,7 @@ Uses eigen 3.4.0 cpp library
 [Portfolio Assignment: ML Algorithms from Scratch Naive Bayes](naiveBayesScratch.cpp)
 
 [Portfolio Assignment: ML Algorithms from Scratch Document](ML_Algorithms_from_Scratch.pdf)
+
+# Searching for Similarity
+
+[Portfolio Assignment: Searching for Similarity Repository](https://github.com/zaiquiriw/ml-similarties/)
