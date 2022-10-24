@@ -1,0 +1,102 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+library(e1071)
+library(MASS)
+df <- read.csv("CO2_cleaned_restructured.csv")
+str(df)
+```
+
+Remove columns.
+
+```{r}
+df <- df[,c("Country","Year","Population.2022.","Area","Density.km2.","CO2.emission..Tons.")]
+str(df)
+```
+
+Format columns.
+
+```{r}
+df$Density.km2. <- as.numeric(gsub("([0-9]+).*$", "\\1", df$Density.km2.))
+df$Country <- factor(df$Country)
+```
+
+Plot emission as a function of year colored by country.
+
+```{r}
+plot(df$Year,df$CO2.emission..Tons.,col=df$Country)
+```
+
+Plot emission as a function of population.
+
+```{r}
+plot(df$Population.2022.,df$CO2.emission..Tons.,col=df$Country)
+```
+
+Training and testing data.
+
+```{r}
+set.seed(1234)
+spec <- c(train=.6, test=.2, validate=.2)
+i <- sample(cut(1:nrow(df),
+                nrow(df)*cumsum(c(0,spec)), labels=names(spec)))
+train <- df[i=="train",]
+test <- df[i=="test",]
+vald <- df[i=="validate",]
+```
+
+Run linear regression for baseline.
+
+```{r}
+lm1 <- lm(CO2.emission..Tons.~.,data=train)
+pred <- predict(lm1, newdata=test)
+cor_lm1 <- cor(pred,test$CO2.emission..Tons.)
+mse_lm1 <- mean((pred-test$CO2.emission..Tons.)^2)
+print(paste("Correlation: ", cor_lm1))
+print(paste("MSE: ", mse_lm1))
+```
+
+Run svm.
+
+```{r}
+svm1 <- svm(CO2.emission..Tons.~., data=train, kernel="linear", cost=10, scale=TRUE)
+summary(svm1)
+```
+
+Evaluate svm.
+
+```{r}
+pred <- predict(svm1, newdata=test)
+cor_svm1 <- cor(pred, test$CO2.emission..Tons.)
+mse_svm1 <- mean((pred-test$CO2.emission..Tons.)^2)
+print(paste("Correlation: ", cor_svm1))
+print(paste("MSE: ", mse_svm1))
+```
+
+Try different costs.
+
+```{r}
+tune_svm1 <- tune(svm, CO2.emission..Tons.~., data=vald, kernel="linear", ranges=list(cost=c(0.001,0.01,0.1,1,5,10,100)))
+summary(tune_svm1)
+```
+
+Try with polynomial.
+
+```{r}
+tune_svm2 <- tune(svm, CO2.emission..Tons.~., data=vald, kernel="polynomial", ranges=list(cost=c(0.001,0.01,0.1,1,5,10,100)))
+summary(tune_svm2)
+```
+
+Try with radial.
+
+```{r}
+tune_svm3 <- tune(svm, CO2.emission..Tons.~., data=vald, kernel="radial", ranges=list(cost=c(0.001,0.01,0.1,1,5,10,100)))
+summary(tune_svm3)
+```
+
+These algorithms are fairly slow. Each model takes about 10 minutes to calculate. This makes it difficult to make minor adjustments to the parameters for testing. It seems that radial with higher cost is the best. That is the only time the error dropped below 1e20, but only by a small amount. Making the cost even higher may reduce the error even more.

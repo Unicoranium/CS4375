@@ -1,0 +1,130 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+df <- read.csv("smoking.csv")
+str(df)
+```
+
+```{r}
+df <- subset(df, select=-c(ID,oral))
+```
+
+Format columns.
+
+```{r}
+df$gender <- factor(df$gender)
+# df$oral <- factor(df$oral) #single factor
+df$dental.caries <- factor(df$dental.caries)
+df$tartar <- factor(df$tartar)
+df$smoking <- factor(df$smoking)
+df$hearing.left. <- factor(df$hearing.left.)
+df$hearing.right. <- factor(df$hearing.right.)
+
+levels(df$dental.caries) <- c("N","Y")
+levels(df$smoking) <- c("N","Y")
+```
+
+Training and testing data.
+
+```{r}
+set.seed(1234)
+i <- sample(nrow(df), 0.75*nrow(df), replace=FALSE)
+train <- df[i,]
+test <- df[-i,]
+```
+
+Calculate decision tree.
+
+```{r}
+library(rpart)
+tree1 <- rpart(smoking~., data=train, method="class")
+summary(tree1)
+```
+
+Plot tree.
+
+```{r}
+plot(tree1)
+text(tree1, cex=0.8, pretty=0)
+```
+
+Calculate accuracy
+
+```{r}
+library(mltools)
+pred <- predict(tree1, newdata=test, type="class")
+acc_t <- mean(pred==test$smoking)
+mcc_t <- mcc(factor(pred),test$smoking)
+print(paste("Accuracy = ", acc_t))
+print(paste("mcc = ", mcc_t))
+```
+
+Random Forest
+
+```{r}
+library(randomForest)
+set.seed(1234)
+rf <- randomForest(smoking~., data=train, importance=TRUE)
+rf
+```
+
+Evaluate Forest
+
+```{r}
+pred <- predict(rf, newdata=test, type="response")
+acc_rf <- mean(pred==test$smoking)
+mcc_rf <- mcc(factor(pred),test$smoking)
+print(paste("Accuracy = ", acc_rf))
+print(paste("mcc = ", mcc_rf))
+```
+
+Accuracy increased for the forest over the tree.
+
+```{r}
+library(xgboost)
+train_label = ifelse(train$smoking=="Y",1,0)
+train_matrix = data.matrix(subset(train,select=-c(smoking)))
+model <- xgboost(data=train_matrix,label=train_label,nrounds=100,objective="binary:logistic")
+```
+
+Evaluate.
+
+```{r}
+test_label = ifelse(test$smoking=="Y",1,0)
+test_matrix = data.matrix(subset(test,select=-c(smoking)))
+
+probs <- predict(model, test_matrix)
+pred <- ifelse(probs>0.5, 1, 0)
+
+acc_xg <- mean(pred==test_label)
+mcc_xg <- mcc(pred, test_label)
+
+print(paste("accuracy = ", acc_xg))
+print(paste("mcc = ", mcc_xg))
+```
+
+XGBoost did better than the original tree, but the forest still had higher accuracy.
+
+Try Adabag
+
+```{r}
+library(adabag)
+adab1 <- boosting(smoking~., data=train, boos=TRUE, mfinal=20, coeflearn='Breiman')
+summary(adab1)
+```
+
+Evaluate.
+
+```{r}
+pred <- predict(adab1, newdata=test, type="response")
+acc_adabag <- mean(pred$class==test$smoking)
+mcc_adabag <- mcc(factor(pred$class), test$smoking)
+print(paste("accuracy=", acc_adabag))
+print(paste("mcc=", mcc_adabag))
+```
+
+This one took significantly longer to run, but only had slightly better accuracy than the original decision tree. 

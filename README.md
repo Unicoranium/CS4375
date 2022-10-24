@@ -33,3 +33,13 @@ Uses eigen 3.4.0 cpp library
 # Searching for Similarity
 
 [Portfolio Assignment: Searching for Similarity Repository](https://github.com/zaiquiriw/ml-similarties/)
+
+# Kernel and Ensemble Methods
+
+[Portfolio Assigment: Kernel Regression](kernel_regression.pdf)
+
+[Portfolio Assigment: Kernel Classification](kernel_classification.pdf)
+
+[Portfolio Assigment: Ensemble Classification](ensemble_classification.pdf)
+
+[Portfolio Assigment: Kernel and Ensemble Document](kernel_ensemble.pdf)

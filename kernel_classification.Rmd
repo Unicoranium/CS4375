@@ -1,0 +1,87 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(e1071)
+library(MASS)
+df <- read.csv("smoking.csv")
+str(df)
+```
+
+```{r}
+df <- subset(df, select=-c(ID,oral))
+```
+
+Format columns.
+
+```{r}
+df$gender <- factor(df$gender)
+# df$oral <- factor(df$oral) #single factor
+df$dental.caries <- factor(df$dental.caries)
+df$tartar <- factor(df$tartar)
+df$smoking <- factor(df$smoking)
+df$hearing.left. <- factor(df$hearing.left.)
+df$hearing.right. <- factor(df$hearing.right.)
+
+levels(df$dental.caries) <- c("N","Y")
+levels(df$smoking) <- c("N","Y")
+```
+
+Plot smoking as a function of age.
+
+```{r}
+plot(df$smoking~df$age)
+```
+
+Plot emission as a function of population.
+
+```{r}
+plot(df$smoking~df$weight.kg.)
+```
+
+Training and testing data.
+
+```{r}
+set.seed(1234)
+spec <- c(train=.6, test=.2, validate=.2)
+df_ <- df
+i <- sample(1:nrow(df),10000,replace=FALSE)
+df <- df[i,]
+i <- sample(cut(1:nrow(df),
+                nrow(df)*cumsum(c(0,spec)), labels=names(spec)))
+train <- df[i=="train",]
+test <- df[i=="test",]
+vald <- df[i=="validate",]
+```
+
+Run svm.
+
+```{r}
+svm1 <- svm(smoking~., data=train, kernel="linear", cost=10, scale=TRUE)
+summary(svm1)
+```
+
+Try different costs.
+
+```{r}
+tune_svm1 <- tune(svm, smoking~., data=vald, kernel="linear", ranges=list(cost=c(0.001,0.01,0.1,1,5,10,100)))
+summary(tune_svm1)
+```
+
+Try with polynomial.
+
+```{r}
+tune_svm2 <- tune(svm, smoking~., data=vald, kernel="polynomial", ranges=list(cost=c(0.001,0.01,0.1,1,5,10,100)))
+summary(tune_svm2)
+```
+
+Try with radial.
+
+```{r}
+tune_svm3 <- tune(svm, smoking~., data=vald, kernel="radial", ranges=list(cost=c(0.001,0.01,0.1,1,5,10,100)))
+summary(tune_svm3)
+```
+
+These algorithms are fairly slow. Each model takes about 5 minutes to calculate. This makes it difficult to make minor adjustments to the parameters for testing. It seems that radial with cost of 1 is the best. Due to the size of the dataset, I had to sample it in order to run the algorithms in a timely manner.
