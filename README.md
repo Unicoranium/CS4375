@@ -43,3 +43,7 @@ Uses eigen 3.4.0 cpp library
 [Portfolio Assigment: Ensemble Classification](ensemble_classification.pdf)
 
 [Portfolio Assigment: Kernel and Ensemble Document](kernel_ensemble.pdf)
+
+# ML with sklearn
+
+[Portfolio Assignment: ML with sklearn](ml_sklearn.pdf)
