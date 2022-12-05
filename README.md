@@ -47,3 +47,7 @@ Uses eigen 3.4.0 cpp library
 # ML with sklearn
 
 [Portfolio Assignment: ML with sklearn](ml_sklearn.pdf)
+
+# Image Classification
+
+[Portfolio Assignment: Image Classification](image_classification.pdf)
